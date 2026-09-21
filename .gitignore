@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env*
+coverage/
+.pnpm-store/
+dist-mock/
+draft_SPEC.md
+artifacts/
+
+# 内部ドキュメント（非公開）
+DEVELOPMENT.md
+NOTES.md
+SPEC_V2.md
+FILES.md

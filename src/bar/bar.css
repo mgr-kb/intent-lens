@@ -1,0 +1,17 @@
+@import '../shared/ui/base.css';
+:root { line-height: 1.25; font-size: 12px; }
+body { overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 3px; height: 64px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+form { display: flex; align-items: center; flex: 1; min-width: 60px; gap: 2px; }
+input { width: 100%; min-width: 20px; height: 36px; border: 1px solid var(--border); border-radius: 5px; color: var(--fg); background: var(--surface); padding: 6px; }
+input::placeholder { color: var(--muted); opacity: 1; }
+button { min-height: 32px; height: 32px; min-width: 26px; padding: 2px; font-size: 18px; border-color: transparent; }
+button:disabled { opacity: .55; cursor: default; }
+.status { width: max-content; max-width: 96px; font-size: 11px; text-align: center; overflow-wrap: anywhere; }
+.status a { display: block; color: var(--accent); }
+.mock { font-size: 9px; color: var(--muted); }
+.spinner { display: inline-block; width: 9px; height: 9px; margin-right: 3px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.invalidated .status { max-width: none; flex: 1; color: var(--muted); }
+.invalidated form, .invalidated > button, .invalidated .mock { display: none; }
