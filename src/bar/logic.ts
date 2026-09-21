@@ -14,8 +14,9 @@ export function statusText(status: Status | undefined): string {
  if (progress?.error === 'auth') return '認証エラー';
  if (progress?.failed) return '通信エラー';
  if (!status.state?.intent) return '検索意図を入力';
- if (!progress || progress.pending) return '判定中';
+ if (!progress) return '判定中';
+ if (progress.pending) return `判定中 (${progress.analyzed}/${progress.total})`;
  const hits = status.hits ?? { count: progress.highlighted, index: 0 };
  if (hits.count) return hits.index ? `${hits.count}件 ${hits.index}/${hits.count}` : `${hits.count}件`;
- return progress.analyzed > 0 ? '該当なし' : '表示範囲は未解析';
+ return progress.total > 0 ? '該当なし' : '検索対象なし';
 }

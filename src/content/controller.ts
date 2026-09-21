@@ -154,9 +154,10 @@ export class ContentController {
   this.sendTimer = setTimeout(() => { this.flush(); }, DEBOUNCE_MS);
  }
  private flush(): void {
-  if (!this.active() || this.root.hidden || !this.state) return;
+  if (!this.active() || this.root.hidden || !this.state || this.requests.length) return;
   const current = extract(this.root);
-  const candidates = this.records.filter(saved => this.visible.includes(saved.element) && !this.decisions[saved.fingerprint] && stillMatches(saved, current.find(t => t.element === saved.element)));
+  const eligible = this.records.filter(saved => !this.decisions[saved.fingerprint] && stillMatches(saved, current.find(t => t.element === saved.element)));
+  const candidates = [...eligible.filter(saved => this.visible.includes(saved.element)), ...eligible.filter(saved => !this.visible.includes(saved.element))];
   const targets = candidates.reduce<readonly Snapshot[]>((all, saved) =>
    all.length < MESSAGE_TARGET_MAX && !all.some(t => t.fingerprint === saved.fingerprint || t.target.id === saved.target.id) ? [...all, saved] : all, []);
   if (!targets.length) return;
@@ -178,7 +179,7 @@ export class ContentController {
   const request = this.requests.find(r => r.id === id); if (!request) return;
   clearTimeout(request.timer); this.requests = this.requests.filter(r => r.id !== id);
   this.decisions = { ...this.decisions, ...Object.fromEntries(request.targets.map(t => [t.fingerprint, { kind: 'failed', error } as const])) };
-  this.reportProgress();
+  this.reportProgress(); this.scheduleSend();
  }
  receive(raw: unknown): Hits | undefined {
   const parsed = workerEventSchema.safeParse(raw); if (!parsed.success || this.destroyed) return;
@@ -213,21 +214,21 @@ export class ContentController {
    const result = event.results.find(r => r.id === saved.target.id && r.fingerprint === saved.fingerprint)!;
    return [saved.fingerprint, { kind: 'done', highlighted: result.highlighted } as const];
   })) };
-  this.applyKnown();
+  this.applyKnown(); this.scheduleSend();
  }
  private applyKnown(targets: readonly ExtractedTarget[] = extract(this.root)): void {
   if (!this.active()) return;
   this.records.forEach(saved => {
    const decision = this.decisions[saved.fingerprint];
    if (!stillMatches(saved, targets.find(t => t.element === saved.element))) { this.highlight.remove(saved.element); return; }
-   if (decision?.kind === 'done' && this.visible.includes(saved.element)) this.highlight.apply(saved.element, decision.highlighted);
+   if (decision?.kind === 'done') this.highlight.apply(saved.element, decision.highlighted);
   });
   this.reportProgress(targets);
  }
  private reportProgress(current: readonly ExtractedTarget[] = extract(this.root)): void {
   if (!this.active() || !this.state) return;
   const records = this.records.filter(saved => stillMatches(saved, current.find(t => t.element === saved.element)));
-  const progress = summarizeProgress(records, this.visible, this.decisions, this.highlight);
+  const progress = summarizeProgress(records, this.decisions, this.highlight);
   const serialized = JSON.stringify(progress);
   if (serialized === this.lastProgress) return;
   this.lastProgress = serialized;

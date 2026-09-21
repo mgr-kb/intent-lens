@@ -41,7 +41,7 @@ describe('highlight observation hardening', () => {
   const marker = new Highlighter(document); marker.apply(first!, true);
   second!.classList.add(marker.className); first!.classList.remove(marker.className);
   const records = [first!, second!].map((element, i) => ({ element, fingerprint: String(i), target: { id: String(i), text: element.textContent!, context: '' } }));
-  expect(summarizeProgress(records, [first!, second!], {}, marker).highlighted).toBe(1);
+  expect(summarizeProgress(records, {}, marker).highlighted).toBe(1);
   first!.remove(); expect(marker.count([first!, second!])).toBe(0);
   marker.clear(); expect(marker.count([second!])).toBe(0);
  });

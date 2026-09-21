@@ -6,7 +6,7 @@ it('distinguishes unsearched, pending, parsed-empty, errors and hit navigation',
  expect(statusText(undefined)).toBe('接続中');
  expect(statusText({ ...base, configured: false })).toBe('APIキー未設定');
  expect(statusText({ ...base, configured: false, mock: true })).toBe('判定中');
- const progress = { visible: 1, analyzed: 1, pending: 0, failed: 0, highlighted: 0 };
+ const progress = { total: 1, analyzed: 1, pending: 0, failed: 0, highlighted: 0 };
  const done = { ...base, state: { ...base.state!, progress } };
  expect(statusText(done)).toBe('該当なし');
  expect(statusText({ ...done, hits: { count: 3, index: 2 } })).toBe('3件 2/3');
@@ -21,4 +21,11 @@ it('uses Enter to search edited text and navigate only already-submitted hits', 
  expect(intentError('👨‍👩‍👧‍👦'.repeat(300))).toBe('');
  expect(intentError(' '.repeat(5))).not.toBe('');
  expect(intentError('a'.repeat(301))).not.toBe('');
+});
+
+it('reports page-wide progress and never says no matches while any block remains pending or failed', () => {
+ const progress = { total: 5, analyzed: 2, pending: 3, failed: 0, highlighted: 1 };
+ expect(statusText({ ...base, state: { ...base.state!, progress }, hits: { count: 1, index: 0 } })).toBe('判定中 (2/5)');
+ expect(statusText({ ...base, state: { ...base.state!, visible: false, progress } })).toBe('判定中 (2/5)');
+ expect(statusText({ ...base, state: { ...base.state!, progress: { ...progress, total: 0, analyzed: 0, pending: 0, highlighted: 0 } } })).toBe('検索対象なし');
 });

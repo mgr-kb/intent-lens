@@ -33,7 +33,7 @@ it('focuses the isolated input, searches via Enter, validates text and closes on
  expect(send.mock.calls.every(([message]) => !('tabId' in message))).toBe(true);
 });
 it('restores a submitted intent, navigates with Enter/Shift+Enter and exposes a polite count', async () => {
- status = { ...status, state: { ...status.state!, intent: 'cat', progress: { visible: 2, analyzed: 2, pending: 0, failed: 0, highlighted: 2 } }, hits: { count: 2, index: 0 } };
+ status = { ...status, state: { ...status.state!, intent: 'cat', progress: { total: 2, analyzed: 2, pending: 0, failed: 0, highlighted: 2 } }, hits: { count: 2, index: 0 } };
  render(<Bar />); await screen.findByText('2件'); const input = screen.getByLabelText('このページで探したい内容') as HTMLInputElement;
  expect(input.value).toBe('cat'); expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
  fireEvent.keyDown(input, { key: 'Enter' }); await screen.findByText('2件 1/2');

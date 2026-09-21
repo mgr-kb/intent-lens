@@ -55,10 +55,10 @@ async function dispatchVisible(): Promise<Analyze> {
  show(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle(); return analyses().at(-1)!;
 }
 describe('content workflow', () => {
- it('sends hello but no bodies until IntersectionObserver reports viewport entry', async () => {
-  await start(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
-  expect(send.mock.calls[0]?.[0]).toEqual({ type: 'hello', visible: true }); expect(analyses()).toEqual([]);
-  const request = await dispatchVisible(); expect(request.targets).toHaveLength(2);
+ it('analyzes and highlights all loaded blocks without any viewport entry', async () => {
+  await start(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+  expect(send.mock.calls[0]?.[0]).toEqual({ type: 'hello', visible: true });
+  const request = analyses()[0]!; expect(request.targets).toHaveLength(2);
   await result(request); expect(document.querySelectorAll('[class^="h-"]')).toHaveLength(2);
  });
  it('deduplicates identical normalized body fingerprints while highlighting both elements', async () => {
@@ -90,7 +90,8 @@ describe('content workflow', () => {
   document.querySelector('main')!.insertAdjacentHTML('beforeend', '<p>Dynamically added paragraph with sufficient text.</p>');
   await settle(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
   expect(first.className.startsWith('h-')).toBe(false);
-  const request = await dispatchVisible(); expect(request.targets.map(t => t.text)).toEqual(['Updated paragraph with enough visible characters.', 'Dynamically added paragraph with sufficient text.']);
+  await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+  const request = analyses().at(-1)!; expect(request.targets.map(t => t.text)).toEqual(['Updated paragraph with enough visible characters.', 'Dynamically added paragraph with sufficient text.']);
   await result(request); const count = analyses().length;
   await settle(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 3); expect(analyses()).toHaveLength(count);
  });
@@ -216,4 +217,45 @@ it.each(['sync-throw', 'rejection'] as const)('stops after invalidated transport
  else send.mockRejectedValue(new Error('Extension context invalidated.'));
  await start(); await vi.advanceTimersByTimeAsync(5000);
  expect(send).toHaveBeenCalledTimes(1); expect(vi.getTimerCount()).toBe(0); expect(observed).toEqual([]);
+});
+
+it('prioritizes viewport blocks, then continues offscreen blocks in document order with bounded outstanding work', async () => {
+ document.body.innerHTML = '<main>' + Array.from({ length: 40 }, (_, i) => '<p>Unique paragraph with enough text number ' + i + '</p>').join('') + '</main>';
+ await start();
+ const blocks = Array.from(document.querySelectorAll('p'));
+ show([blocks[35]!]);
+ await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+ const first = analyses()[0]!;
+ expect(first.targets.map(t => t.text)).toEqual([blocks[35]!.textContent, ...blocks.slice(0, 31).map(t => t.textContent)]);
+ await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 3); expect(analyses()).toHaveLength(1);
+ await result(first);
+ await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+ const second = analyses()[1]!;
+ expect(second.targets.map(t => t.text)).toEqual([31, 32, 33, 34, 36, 37, 38, 39].map(i => blocks[i]!.textContent));
+ await result(second);
+ const progress = send.mock.calls.map(([m]) => m).filter(m => m.type === 'analysis-status').at(-1);
+ expect(progress).toMatchObject({ progress: { total: 40, analyzed: 40, pending: 0, failed: 0, highlighted: 40 } });
+ const scroll = vi.fn(); blocks[0]!.scrollIntoView = scroll;
+ expect(controller.receive({ type: 'jump', direction: 'next', generation: state.generation })).toEqual({ count: 40, index: 1 });
+ expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+});
+it('leaves remaining offscreen work pending while hidden and resumes on visibility return', async () => {
+ document.body.innerHTML = Array.from({ length: 34 }, (_, i) => '<p>Unique long paragraph for hidden tab number ' + i + '</p>').join('');
+ await start(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+ const first = analyses()[0]!;
+ hidden = true; document.dispatchEvent(new Event('visibilitychange'));
+ await result(first); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 3); await settle();
+ expect(analyses()).toHaveLength(1);
+ expect(send.mock.calls.map(([m]) => m).filter(m => m.type === 'analysis-status').at(-1)).toMatchObject({ progress: { total: 34, analyzed: 32, pending: 2 } });
+ hidden = false; document.dispatchEvent(new Event('visibilitychange')); await settle();
+ await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+ expect(analyses()[1]?.targets).toHaveLength(2);
+});
+it('reports budget errors for page-wide work without reporting parsed-empty success', async () => {
+ const original = send.getMockImplementation()!;
+ send.mockImplementation(message => message.type === 'analyze' ? Promise.resolve({ ok: false, error: 'rate-limit' }) : original(message));
+ await start(); await vi.advanceTimersByTimeAsync(DEBOUNCE_MS); await settle();
+ expect(send.mock.calls.map(([m]) => m).filter(m => m.type === 'analysis-status').at(-1)).toMatchObject({ progress: { total: 2, analyzed: 0, failed: 2, error: 'rate-limit' } });
+ await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 3);
+ expect(analyses()).toHaveLength(1);
 });

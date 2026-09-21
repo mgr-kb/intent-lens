@@ -60,7 +60,9 @@ try {
  assert.equal(await page.locator('#excluded').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
  assert.equal(await page.evaluate(() => window.capturedKeys), 0, 'page capture must not receive iframe typing');
  assert.equal(await page.locator('iframe').count(), 0, 'closed shadow hides the frame from the page');
- completed.push('a: action-equivalent toggle → isolated intent → highlights and count');
+ assert.equal(await page.evaluate(() => window.scrollY), 0, 'search must not scroll');
+ assert.ok(await page.locator('#hit-two').evaluate(el => el.getBoundingClientRect().top > innerHeight), 'second hit is below viewport but already counted');
+ completed.push('a: full loaded page search counts offscreen hits without scrolling');
  await page.emulateMedia({ colorScheme: 'light' }); await shot(bar(page).locator('main.bar'), 'v2-bar-light.png');
  await page.emulateMedia({ colorScheme: 'dark' }); await shot(bar(page).locator('main.bar'), 'v2-bar-dark.png');
  await page.emulateMedia({ colorScheme: 'light' });
@@ -68,6 +70,7 @@ try {
  await until(() => highlights(page), hits => hits.find(hit => hit.current)?.id === 'hit-one', 'Enter next');
  await bar(page).getByRole('button', { name: '次へ', exact: true }).click();
  await until(() => highlights(page), hits => hits.find(hit => hit.current)?.id === 'hit-two', 'next button');
+ await until(() => page.locator('#hit-two').evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), Boolean, 'smooth jump brings offscreen hit into viewport');
  await bar(page).getByRole('button', { name: '前へ', exact: true }).click();
  await until(() => highlights(page), hits => hits.find(hit => hit.current)?.id === 'hit-one', 'previous button');
  await input(page).press('Shift+Enter');

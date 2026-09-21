@@ -112,10 +112,9 @@ export class Engine {
  private async setIntent(id: number, intent: string): Promise<TabState> {
   const state = this.session.tabs[id];
   if (!state) throw new JevError('cancelled');
-  if (intent && state.enabled && state.intent === intent && !this.session.paused) return state;
   if (intent && !this.configured()) throw new JevError('settings-required');
   this.queue.cancel(id);
-  const next = { ...state, intent, barOpen: !!intent, barDocument: intent ? state.barDocument : undefined, barSession: intent ? state.barSession ?? crypto.randomUUID() : undefined, enabled: !!intent, requests: 0, progress: undefined, generation: { ...state.generation, tab: crypto.randomUUID() } };
+  const next = { ...state, intent, barOpen: !!intent, barDocument: intent ? state.barDocument : undefined, barSession: intent ? state.barSession ?? crypto.randomUUID() : undefined, enabled: !!intent, requests: state.intent === intent ? state.requests : 0, progress: undefined, generation: { ...state.generation, tab: crypto.randomUUID() } };
   await this.tab(id, next);
   if (intent && this.session.paused) { await this.commit({ ...this.session, paused: false }); this.queue.setPaused(false); }
   await this.resetNotice(id, next); return next;

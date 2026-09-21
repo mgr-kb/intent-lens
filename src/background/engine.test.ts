@@ -124,7 +124,7 @@ describe('whole-target completion', () => {
 describe('tab status contract', () => {
  it('persists generation-guarded DOM counts and returns tab intent without a key', async () => {
   const engine = new Engine(new MockJevClient()); const state = await enable(engine);
-  const progress = { highlighted: 2, visible: 3, analyzed: 2, pending: 0, failed: 1, error: 'auth' };
+  const progress = { highlighted: 2, total: 3, analyzed: 2, pending: 0, failed: 1, error: 'auth' };
   await engine.message({ type: 'analysis-status', generation: state.generation, progress }, contentSender);
   const result = await engine.message({ type: 'get-tab-state', tabId: 1 }, contentSender) as { state: TabState };
   expect(result.state.progress).toEqual(progress); expect(result.state.intent).toBe('Jev');
@@ -136,7 +136,7 @@ describe('tab status contract', () => {
  });
  it('rejects invalid count totals and count reports from options senders', async () => {
   const engine = new Engine(new MockJevClient()); const state = await enable(engine);
-  const message = { type: 'analysis-status', generation: state.generation, progress: { highlighted: 0, visible: 1, analyzed: 0, pending: 0, failed: 0 } };
+  const message = { type: 'analysis-status', generation: state.generation, progress: { highlighted: 0, total: 1, analyzed: 0, pending: 0, failed: 0 } };
   await expect(engine.message(message, contentSender)).rejects.toThrow('invalid-input');
   await expect(engine.message({ ...message, progress: { ...message.progress, pending: 1 } }, optionsSender)).rejects.toThrow('invalid-input');
  });

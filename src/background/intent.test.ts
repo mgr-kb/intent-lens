@@ -16,7 +16,7 @@ it('sets tab intent, isolates tabs, updates generation and clears only that tab 
  await hello(engine); await hello(engine, { ...contentSender, tab: { id: 2 }, documentId: 'doc2' });
  const initial = await engine.message({ type: 'set-intent', tabId: 1, intent: 'cats' }, contentSender) as TabState;
  const second = await engine.message({ type: 'set-intent', tabId: 2, intent: 'dogs' }, { ...contentSender, tab: { id: 2 }, documentId: 'doc2' }) as TabState;
- await engine.message({ type: 'analysis-status', generation: initial.generation, progress: { highlighted: 1, visible: 1, analyzed: 1, pending: 0, failed: 0 } }, contentSender);
+ await engine.message({ type: 'analysis-status', generation: initial.generation, progress: { highlighted: 1, total: 1, analyzed: 1, pending: 0, failed: 0 } }, contentSender);
  fake.tabs.sendMessage.mockClear();
  const changed = await engine.message({ type: 'set-intent', tabId: 1, intent: 'birds' }, contentSender) as TabState;
  expect(changed.intent).toBe('birds'); expect(changed.enabled).toBe(true);
@@ -63,4 +63,18 @@ it('discards v1 session and local focus without migrating intent or losing the k
  const storage = new Storage(); expect(await storage.settings()).toEqual({ key: 'test-only', threshold: 0.6 });
  expect(await fake.storage.local.get()).not.toHaveProperty('focus');
  expect(await storage.session()).toMatchObject({ version: 2, tabs: {}, cache: [] });
+});
+
+it('explicitly re-searches the same intent with a new generation without resetting spending or cached scores', async () => {
+ const engine = new Engine(new MockJevClient()); await hello(engine);
+ const first = await engine.message({ type: 'set-intent', tabId: 1, intent: 'cats' }, contentSender) as TabState;
+ const storage = new Storage(); const saved = await storage.session();
+ await storage.persist({ ...saved, cache: [['cached-score', 0.7]], tabs: { ...saved.tabs, 1: { ...first, requests: 200 } } });
+ const restarted = new Engine(new MockJevClient());
+ fake.tabs.sendMessage.mockClear();
+ const second = await restarted.message({ type: 'set-intent', tabId: 1, intent: 'cats' }, contentSender) as TabState;
+ expect(second.generation.tab).not.toBe(first.generation.tab);
+ expect(second.requests).toBe(200);
+ expect((await storage.session()).cache).toEqual([['cached-score', 0.7]]);
+ expect(fake.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({ type: 'reset' }));
 });
